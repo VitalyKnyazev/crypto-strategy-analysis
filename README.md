@@ -11,4 +11,4 @@ cargo run
 
 ## 2025-11-02 Modernized, fixed and extended original project
 
-- See NOTES_VK.md for what's changed
+- See [NOTES_VK.md](./NOTES_VK.md) for what's changed
