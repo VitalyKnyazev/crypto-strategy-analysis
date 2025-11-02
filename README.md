@@ -1,6 +1,12 @@
-- This is a demo project demo on learning of rust
+# This is a demo project demo on learning of rust
+
+## 2021-11-07 Original project
+
 - Goal is to analysis crypto price with different trading strategies (MACD, DCA, HODL)
 - How to run:
-```
+
+```shell
 cargo run
 ```
+
+## 2025-11-02 Modernized, fixed and extended original project

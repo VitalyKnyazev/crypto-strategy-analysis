@@ -1,6 +1,7 @@
 use crate::data::BinanceKline;
-use crate::traders::{GenericTrader, StakeSize, TradingFee};
 use crate::indicators::BinanceIndicatorInstance;
+use crate::traders::{GenericTrader, StakeSize, TradingFee};
+use anyhow::{anyhow, Result};
 use yata::core::{Action, IndicatorResult};
 use yata::indicators::MACD;
 use yata::prelude::dd::IndicatorInstanceDyn;
@@ -9,42 +10,30 @@ use yata::prelude::*;
 use log::debug;
 
 struct IndicatorInstanceWrapper(Box<dyn IndicatorInstanceDyn<BinanceKline>>);
+
 impl BinanceIndicatorInstance for IndicatorInstanceWrapper {
     fn next_binance_kline(&mut self, candle: &BinanceKline) -> IndicatorResult {
         self.0.next(candle)
     }
 }
 
-pub struct MACDTrader<'a> {
+pub struct MACDTrader {
     trading_fee: TradingFee,
     stake_size: StakeSize,
-    kline_feed: &'a mut dyn Iterator<Item = BinanceKline>,
-    indicator: Box<dyn BinanceIndicatorInstance>,
+    indicator: IndicatorInstanceWrapper,
 }
 
-impl<'a> MACDTrader<'a> {
-    pub fn new(
-        kline_feed: &'a mut dyn Iterator<Item = BinanceKline>,
-        trading_fee: TradingFee,
-        stake_size: StakeSize,
-    ) -> Self {
-        debug!("creating a MACD Trader");
+impl MACDTrader {
+    pub fn new(kline_feed: &[BinanceKline], trading_fee: TradingFee, stake_size: StakeSize) -> Result<Self> {
+        debug!("Creating a MACD Trader");
         let macd = MACD::default();
-        let macd = macd
-            .init(&kline_feed.next().unwrap())
-            .expect("Unable to initialise MACD");
-        let macd = IndicatorInstanceWrapper(Box::new(macd));
-        Self {
-            kline_feed,
-            indicator: Box::new(macd),    // TODO need to fix this over boxing
-            trading_fee,
-            stake_size,
-        }
+        let next_kline = kline_feed.first().ok_or(anyhow!("No klines in MACD feed"))?;
+        let macd = macd.init(next_kline)?;
+        Ok(Self { indicator: IndicatorInstanceWrapper(Box::new(macd)), trading_fee, stake_size })
     }
 }
 
-impl<'a> GenericTrader<'a> for MACDTrader<'a> {
-
+impl GenericTrader for MACDTrader {
     fn stake_size(&self) -> StakeSize {
         self.stake_size
     }
@@ -53,16 +42,13 @@ impl<'a> GenericTrader<'a> for MACDTrader<'a> {
         self.trading_fee
     }
 
-    fn kline(&mut self) -> &mut dyn Iterator<Item = BinanceKline> {
-        self.kline_feed
-    }
-
     fn indicator(&mut self) -> &mut dyn BinanceIndicatorInstance {
-        self.indicator.as_mut()
+        &mut self.indicator
     }
 
-    fn determine_trade(signals: &[Action]) -> Action {
-        debug!("determine trades with macd signal");
-        *signals.get(1).unwrap()
+    fn determine_trade(signals: &[Action]) -> Result<Action> {
+        debug!("Determine trades with MACD signal");
+        let val = signals.get(1).ok_or(anyhow!("No MACD signal found"))?;
+        Ok(*val)
     }
 }
